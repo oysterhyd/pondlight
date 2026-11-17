@@ -167,6 +167,20 @@ function drawPond(ctx, state) {
   }
   ctx.restore();
 
+  // Two broad moonlight patches breathing across the surface.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const [fx, fy, fr, sp] of [[0.3, 0.36, 300, 0.35], [0.72, 0.62, 380, 0.26]]) {
+    const px = FIELD.width * fx + Math.sin(state.time * sp) * 60;
+    const py = FIELD.height * fy + Math.cos(state.time * sp * 0.76) * 44;
+    const g = ctx.createRadialGradient(px, py, 10, px, py, fr);
+    g.addColorStop(0, 'rgba(120, 200, 235, 0.05)');
+    g.addColorStop(1, 'rgba(120, 200, 235, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(px - fr, py - fr, fr * 2, fr * 2);
+  }
+  ctx.restore();
+
   // Lily pads from the sprite set; flowering pads get the lotus variant.
   state.decor.pads.forEach((pad, i) => {
     const bob = Math.sin(state.time * 0.7 + pad.drift) * 2;
@@ -203,9 +217,21 @@ function drawPond(ctx, state) {
 
 /* ---------------- creatures ---------------- */
 
+/** A squashed, flipped echo of a sprite on the water under its owner. */
+function reflect(ctx, spr, x, y, { rot = 0, scale = 1, flipX = false, alpha = 0.1 } = {}) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.scale(flipX ? -scale : scale, -scale * 0.62);
+  ctx.rotate(-rot);
+  ctx.drawImage(spr.c, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
+  ctx.restore();
+}
+
 export function drawFrog(ctx, x, y, radius, aimAngle, walkPhase, hurt, alpha = 1) {
   const frame = Math.abs(Math.floor(walkPhase * 0.6366)) % 4;
   const spr = FROG_FRAMES[frame];
+  reflect(ctx, spr, x, y + radius * 1.85, { rot: aimAngle + Math.PI / 2, scale: radius / FROG_BODY, alpha: 0.09 * alpha });
   shadow(ctx, x, y, radius * 1.06);
   blit(ctx, spr, x, y, { rot: aimAngle + Math.PI / 2, scale: radius / FROG_BODY, alpha });
   if (hurt) blit(ctx, FROG_WHITE[frame], x, y, { rot: aimAngle + Math.PI / 2, scale: radius / FROG_BODY, alpha: alpha * 0.45 });
@@ -255,6 +281,7 @@ function drawMoth(ctx, foe) {
 function drawBeetle(ctx, foe) {
   const frame = Math.abs(Math.floor(foe.t * 5)) % 2;
   const angle = Math.atan2(foe.vy, foe.vx) + Math.PI / 2;
+  reflect(ctx, BEETLE_FRAMES[frame], foe.x, foe.y + foe.radius * 1.8, { rot: angle, scale: foe.radius / 23, alpha: 0.08 });
   shadow(ctx, foe.x, foe.y, foe.radius * 1.08);
   blit(ctx, BEETLE_FRAMES[frame], foe.x, foe.y, { rot: angle, scale: foe.radius / 23 });
   if (foe.flash > 0) blit(ctx, BEETLE_WHITE[frame], foe.x, foe.y, { rot: angle, alpha: foe.flash * 0.8, scale: foe.radius / 23 });
@@ -264,6 +291,7 @@ function drawSnail(ctx, foe) {
   const tucked = foe.state === 'tuck';
   const frame = tucked ? 1 : 0;
   const angle = Math.atan2(foe.vy, foe.vx) + Math.PI / 2;
+  reflect(ctx, SNAIL_FRAMES[frame], foe.x, foe.y + foe.radius * 1.85, { rot: angle, scale: foe.radius / 20, alpha: 0.09 });
   shadow(ctx, foe.x, foe.y, foe.radius * 1.05);
   blit(ctx, SNAIL_FRAMES[frame], foe.x, foe.y, { rot: angle, scale: foe.radius / 20 });
   if (foe.flash > 0) blit(ctx, SNAIL_WHITE[frame], foe.x, foe.y, { rot: angle, alpha: foe.flash * 0.8, scale: foe.radius / 20 });
@@ -304,9 +332,28 @@ function drawHeron(ctx, foe, state) {
   const face = state.player.x >= foe.x ? 1 : -1;
   const frame = Math.abs(Math.floor(foe.t * 3.2)) % 3;
   const bob = Math.sin(foe.t * 2.1) * 3;
+  reflect(ctx, HERON_FRAMES[frame], foe.x, foe.y + foe.radius * 1.5, { flipX: face < 0, scale: foe.radius / 54, alpha: 0.08 });
   shadow(ctx, foe.x, foe.y + 8, foe.radius * 1.25);
   blit(ctx, HERON_FRAMES[frame], foe.x, foe.y + bob, { flipX: face < 0, scale: foe.radius / 54 });
   if (foe.flash > 0) blit(ctx, HERON_WHITE[frame], foe.x, foe.y + bob, { flipX: face < 0, alpha: foe.flash * 0.75, scale: foe.radius / 54 });
+  if (foe.phase2) {
+    // The second phase shows: a pulsing blood-red ring and a hunter's eye.
+    const pulse = 1 + Math.sin(foe.t * 6) * 0.05;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 82, 82, 0.55)';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.arc(foe.x, foe.y + bob, (foe.radius + 12) * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    const hx = foe.x + face * 86;
+    const hy = foe.y + bob - 78;
+    const glow = ctx.createRadialGradient(hx, hy, 1, hx, hy, 13);
+    glow.addColorStop(0, 'rgba(255, 60, 60, 0.85)');
+    glow.addColorStop(1, 'rgba(255, 60, 60, 0)');
+    circle(ctx, hx, hy, 13, glow);
+    circle(ctx, hx, hy, 3.2, '#ff1744');
+  }
 }
 
 function drawFoe(ctx, foe, state) {
@@ -457,6 +504,8 @@ export function drawWorld(ctx, state) {
   blit(ctx, REED_SHADOW, 8, FIELD.height - 26, { scale: 1.02, alpha: 0.34 });
   blit(ctx, REED_SHADOW, FIELD.width - 10, FIELD.height - 22, { scale: 1.18, alpha: 0.38, flipX: true });
   blit(ctx, REED_SHADOW, FIELD.width - 96, FIELD.height - 8, { scale: 0.8, alpha: 0.28 });
+  blit(ctx, REED_SHADOW, 14, 64, { rot: Math.PI, scale: 0.95, alpha: 0.3 });
+  blit(ctx, REED_SHADOW, FIELD.width - 20, 56, { rot: Math.PI, scale: 1.05, alpha: 0.32, flipX: true });
 }
 
 /* ---------------- HUD and screens ---------------- */
@@ -512,7 +561,7 @@ export function drawHud(ctx, state, { muted = false, banner = true } = {}) {
   // Centre wave plaque.
   const plaqueW = 252;
   panel(ctx, FIELD.width / 2 - plaqueW / 2, 14, plaqueW, 56, 13);
-  shadowedText(ctx, state.wave === 0 ? 'PONDLIGHT' : `WAVE ${state.wave} / ${TOTAL_WAVES}`, FIELD.width / 2, 36, { size: 19, align: 'center', weight: 800, font: DISPLAY, spacing: 2.5 });
+  shadowedText(ctx, state.wave === 0 ? 'PONDLIGHT' : state.wave > TOTAL_WAVES ? `WAVE ${state.wave} · ENDLESS` : `WAVE ${state.wave} / ${TOTAL_WAVES}`, FIELD.width / 2, 36, { size: 19, align: 'center', weight: 800, font: DISPLAY, spacing: 2.5 });
   if (state.phase === PHASE_FIGHT) {
     const left = state.foes.length + state.spawnQueue.length;
     text(ctx, state.boss ? 'the Heron remains' : `${left} pest${left === 1 ? '' : 's'} to go`, FIELD.width / 2, 58, { size: 12, align: 'center', color: COLORS.textDim });
@@ -562,8 +611,9 @@ export function drawHud(ctx, state, { muted = false, banner = true } = {}) {
     if (state.wave >= 1) bannerText(ctx, `Wave ${state.wave} clear!`, 148, '#a5f2c0', 33);
     bannerText(ctx, next === TOTAL_WAVES ? 'Something huge stirs…' : `Wave ${next} incoming`, 190, COLORS.text, 19);
   } else if (state.phase === PHASE_FIGHT && state.waveT < 1.6 && state.wave >= 1) {
-    const label = state.wave === TOTAL_WAVES ? 'THE SHADOW HERON' : `WAVE ${state.wave}`;
-    bannerText(ctx, label, 148, state.wave === TOTAL_WAVES ? '#ffcdd2' : COLORS.text, 36, clamp(1.6 - state.waveT, 0, 1));
+    const isBossWave = state.wave === TOTAL_WAVES || (state.endless && state.wave % 5 === 0);
+    const label = isBossWave ? 'THE SHADOW HERON' : `WAVE ${state.wave}`;
+    bannerText(ctx, label, 148, isBossWave ? '#ffcdd2' : COLORS.text, 36, clamp(1.6 - state.waveT, 0, 1));
   }
 }
 
@@ -727,7 +777,7 @@ export function drawGameOver(ctx, state, best) {
   overlay(ctx, 0.66);
   const card = menuCard(ctx, 560, 430);
   shadowedText(ctx, 'THE POND GOES DARK', FIELD.width / 2, card.y + 58, { size: 37, align: 'center', weight: 800, color: '#ff9d9d', font: DISPLAY, spacing: 1.5 });
-  text(ctx, 'The fireflies scatter. The Heron keeps the lily pads — this time.', FIELD.width / 2, card.y + 98, { size: 15, align: 'center', font: SERIF, italic: true, color: '#b9dde6' });
+  text(ctx, state.endless ? `The endless pond claims its frog at wave ${state.wave}. It will be back.` : 'The fireflies scatter. The Heron keeps the lily pads — this time.', FIELD.width / 2, card.y + 98, { size: 15, align: 'center', font: SERIF, italic: true, color: '#b9dde6' });
   statsLines(ctx, state, card.y + 148);
   if (best > 0) text(ctx, `Best score ${best}`, FIELD.width / 2, card.y + 148 + 5 * 31 + 6, { size: 14, align: 'center', color: COLORS.gold });
   const w = chip(ctx, FIELD.width / 2, card.y + card.h - 34, 'R / click — try again', { size: 13.5, align: 'center' });
@@ -742,8 +792,15 @@ export function drawVictory(ctx, state, best) {
   text(ctx, 'The Shadow Heron flees over the reeds, and the fireflies come home.', FIELD.width / 2, card.y + 166, { size: 15, align: 'center', font: SERIF, italic: true, color: '#b9dde6' });
   statsLines(ctx, state, card.y + 212);
   if (best > 0) text(ctx, `Best score ${best}`, FIELD.width / 2, card.y + 212 + 5 * 31 + 6, { size: 14, align: 'center', color: COLORS.gold });
-  const w = chip(ctx, FIELD.width / 2, card.y + card.h - 34, 'R / click — play again', { size: 13.5, align: 'center' });
-  void w;
+  const cy = card.y + card.h - 34;
+  ctx.save();
+  ctx.font = `700 13.5px ${BODY}`;
+  const w1 = ctx.measureText('Enter — keep swimming · endless').width + 16;
+  const w2 = ctx.measureText('R — new run').width + 16;
+  ctx.restore();
+  const total = w1 + 14 + w2;
+  chip(ctx, FIELD.width / 2 - total / 2, cy, 'Enter — keep swimming · endless', { size: 13.5, align: 'left' });
+  chip(ctx, FIELD.width / 2 - total / 2 + w1 + 14, cy, 'R — new run', { size: 13.5, align: 'left' });
 }
 
 /** The three upgrade cards' rectangles, shared by drawing and clicking. */

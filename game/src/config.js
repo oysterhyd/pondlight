@@ -46,7 +46,7 @@ export const FOE = {
   moth: { radius: 17, health: 38, speed: 64, damage: 10, score: 80, fireflies: 2 },
   beetle: { radius: 23, health: 110, speed: 44, damage: 16, score: 130, fireflies: 3 },
   snail: { radius: 20, health: 150, speed: 30, damage: 12, score: 160, fireflies: 3 },
-  heron: { radius: 54, health: 1500, speed: 56, damage: 20, score: 3000, fireflies: 24 },
+  heron: { radius: 54, health: 1250, speed: 56, damage: 20, score: 3000, fireflies: 24 },
 };
 
 /** The armoured snail: tucked into its shell it shrugs off most damage;

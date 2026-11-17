@@ -7,7 +7,7 @@
 import { FIELD, STEP } from './config.js';
 import { createInput, moveVector, takePress } from './input.js';
 import { createAudio } from './audio.js';
-import { createWorld, stepWorld, applyUpgrade, PHASE_LOST, PHASE_WON } from './world.js';
+import { createWorld, stepWorld, applyUpgrade, enterEndless, PHASE_LOST, PHASE_WON } from './world.js';
 import { drawChoices } from './upgrades.js';
 import {
   drawWorld, drawHud, drawTitle, drawPaused, drawGameOver, drawVictory, drawLevelUp,
@@ -134,7 +134,12 @@ function handleScreenKeys() {
         if (click.x >= r.x && click.x <= r.x + r.w && click.y >= r.y && click.y <= r.y + r.h) chooseUpgrade(i);
       }
     }
-  } else if (screen === SCREEN_OVER || screen === SCREEN_WIN) {
+  } else if (screen === SCREEN_WIN) {
+    // Victory is a door, not an end: Enter keeps swimming into the endless
+    // pond; R starts a fresh run.
+    if (takePress(input, 'Enter', 'Space') || input.clickedAt) { input.clickedAt = null; enterEndless(state); screen = SCREEN_PLAY; }
+    else if (takePress(input, 'KeyR')) newRun();
+  } else if (screen === SCREEN_OVER) {
     if (takePress(input, 'KeyR', 'Enter') || input.clickedAt) { input.clickedAt = null; newRun(); }
   }
 }

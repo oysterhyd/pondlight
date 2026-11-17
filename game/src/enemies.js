@@ -45,6 +45,10 @@ export function makeFoe(kind, x, y, scale, elite = false) {
     summonT: HERON.summonEvery,
     swoopFrom: null,
     swoopTo: null,
+    phase2: false,
+    spiralT: 2.4,
+    spiralA: 0,
+    swoopChain: 0,
     flash: 0,
     dead: false,
   };
@@ -143,11 +147,18 @@ function stepSnail(foe, player, dt, rng) {
 }
 
 /** The Shadow Heron, the wave-ten boss. It stalks, fans feathers, summons
- *  gnats, and swoops across the pond on a telegraphed line. Below a third of
- *  its health it enrages: everything it does comes faster. */
+ *  gnats, and swoops across the pond on a telegraphed line. Below half
+ *  health it crosses into its second phase — announced once, through the
+ *  events list: a rotating spiral of feathers joins the fan, and every
+ *  swoop is followed by a second, chained one. Below a third of its health
+ *  it enrages: everything it does comes faster. */
 function stepHeron(foe, player, dt, rng, events) {
+  if (!foe.phase2 && foe.hp <= foe.maxHp * 0.5) {
+    foe.phase2 = true;
+    events.push({ type: 'phase2', x: foe.x, y: foe.y });
+  }
   const enraged = foe.hp <= foe.maxHp * HERON.enrageBelow;
-  const pace = enraged ? 0.62 : 1;
+  const pace = enraged ? 0.7 : foe.phase2 ? 0.85 : 1;
   foe.stateT += dt;
 
   if (foe.state === 'stalk') {
@@ -155,6 +166,17 @@ function stepHeron(foe, player, dt, rng, events) {
     foe.fanT -= dt;
     foe.summonT -= dt;
     foe.swoopT -= dt;
+    if (foe.phase2) {
+      foe.spiralT -= dt;
+      if (foe.spiralT <= 0) {
+        foe.spiralT = 0.27;
+        foe.spiralA += 0.55;
+        for (const off of [0, Math.PI]) {
+          const a = foe.spiralA + off;
+          events.push({ type: 'feather', x: foe.x, y: foe.y, vx: Math.cos(a) * HERON.fanSpeed * 0.85, vy: Math.sin(a) * HERON.fanSpeed * 0.85 });
+        }
+      }
+    }
     if (foe.fanT <= 0) {
       foe.fanT = HERON.fanInterval * pace;
       const base = angleTo(foe.x, foe.y, player.x, player.y);
@@ -189,9 +211,19 @@ function stepHeron(foe, player, dt, rng, events) {
     foe.x += foe.vx * dt;
     foe.y += foe.vy * dt;
     if (foe.stateT > 1.15 || foe.x < 30 || foe.x > FIELD.width - 30 || foe.y < 30 || foe.y > FIELD.height - 30) {
-      foe.state = 'stalk';
-      foe.stateT = 0;
-      foe.swoopT = HERON.swoopEvery * pace;
+      if (foe.phase2 && (foe.swoopChain || 0) < 1) {
+        // The chained second swoop: straight back across the frog.
+        foe.swoopChain = 1;
+        foe.state = 'warn';
+        foe.stateT = 0;
+        foe.swoopFrom = { x: foe.x, y: foe.y };
+        foe.swoopTo = { x: player.x, y: player.y };
+      } else {
+        foe.swoopChain = 0;
+        foe.state = 'stalk';
+        foe.stateT = 0;
+        foe.swoopT = HERON.swoopEvery * pace;
+      }
     }
   }
   foe.x = clamp(foe.x, foe.radius, FIELD.width - foe.radius);

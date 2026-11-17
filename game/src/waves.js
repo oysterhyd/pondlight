@@ -22,21 +22,37 @@ export const WAVES = [
   { groups: [{ kind: KIND_HERON, count: 1, delay: 1.2, gap: 1 }] },
 ];
 
-/** How much tougher foes get on a given wave (1-based). */
+/** How much tougher foes get on a given wave (1-based). Past wave 10 the
+ *  health curve flattens — endless waves grow by numbers and elites instead. */
 export function waveScale(wave) {
   const w = wave - 1;
   return {
     wave,
-    health: 1 + w * 0.16,
+    health: w <= 9 ? 1 + w * 0.16 : 2.44 + (w - 9) * 0.09,
     damage: 1 + w * 0.07,
-    speed: 1 + w * 0.018,
+    speed: 1 + Math.min(w, 14) * 0.018,
   };
 }
 
-/** Expand a wave's groups into a timed spawn queue, sorted by time. */
+/** Expand a wave's groups into a timed spawn queue, sorted by time.
+ *  Waves past 10 are endless: the hard mixes recycle with growing counts,
+ *  and every fifth wave the Shadow Heron returns with the mix as escort. */
 export function buildSpawnQueue(wave) {
-  const recipe = WAVES[wave - 1];
   const queue = [];
+  if (wave > TOTAL_WAVES) {
+    if (wave % 5 === 0) queue.push({ kind: KIND_HERON, at: 1.2 });
+    const template = WAVES[4 + ((wave - 11) % 5)];
+    const countMul = 1 + (wave - 10) * 0.12;
+    for (const group of template.groups) {
+      const count = Math.max(1, Math.round(group.count * countMul));
+      for (let i = 0; i < count; i += 1) {
+        queue.push({ kind: group.kind, at: group.delay + 2 + i * group.gap });
+      }
+    }
+    queue.sort((a, b) => a.at - b.at);
+    return queue;
+  }
+  const recipe = WAVES[wave - 1];
   for (const group of recipe.groups) {
     for (let i = 0; i < group.count; i += 1) {
       queue.push({ kind: group.kind, at: group.delay + i * group.gap });

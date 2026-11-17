@@ -81,6 +81,7 @@ export function createWorld(seed) {
     rippleT: 0,
     auraT: 1.4,
     waveHurt: false,
+    endless: false,
     announcedWave: 0,
   };
   state.stats = worldStats(state);
@@ -90,6 +91,16 @@ export function createWorld(seed) {
 /** The frog's current derived stats, from its taken upgrades. */
 export function worldStats(state) {
   return computeStats({ PLAYER, BUBBLE }, state.taken);
+}
+
+/** After the Heron falls, keep swimming: endless waves, growing forever. */
+export function enterEndless(state) {
+  state.endless = true;
+  state.phase = PHASE_BREAK;
+  state.phaseT = 2.4;
+  state.cues.push('wave');
+  ring(state.fx, state.player.x, state.player.y, { maxRadius: 170, color: '#80d8ff', width: 4 });
+  floatText(state.fx, state.player.x, state.player.y - 46, 'THE ENDLESS POND', { color: '#80d8ff', size: 22 });
 }
 
 /** Record an upgrade choice and recompute stats, healing any max-HP gain. */
@@ -119,9 +130,10 @@ function spawnFromQueue(state) {
     const point = item.kind === KIND_HERON
       ? { x: FIELD.width / 2, y: 92 }
       : spawnPoint(state.rng, state.player, FIELD);
+    const eliteChance = ELITE.chance + (state.endless ? Math.min(0.15, (state.wave - TOTAL_WAVES) * 0.02) : 0);
     const elite = state.wave >= ELITE.fromWave
       && item.kind !== KIND_HERON && item.kind !== KIND_SNAIL
-      && state.rng() < ELITE.chance;
+      && state.rng() < eliteChance;
     const foe = makeFoe(item.kind, point.x, point.y, waveScale(state.wave), elite);
     foe.phase = state.rng() * Math.PI * 2;
     state.foes.push(foe);
@@ -175,6 +187,9 @@ function killFoe(state, foe) {
     life: 0.6,
   });
   floatText(state.fx, foe.x, foe.y - foe.radius - 6, `+${gained}`, { color: multiplier > 1 ? '#ffd54f' : '#eaf7fa', size: multiplier > 2 ? 19 : 15 });
+  if (foe.radius >= 23 || foe.elite) {
+    ring(state.fx, foe.x, foe.y, { maxRadius: foe.radius * 2.1, color: '#bfeaf2', life: 0.38, width: 2.5 });
+  }
   scatterFireflies(state.pickups, foe.fireflies, foe.x, foe.y, state.rng);
   const heartChance = foe.elite ? ELITE.heartChance : HEART_DROP_CHANCE;
   if (foe.kind !== KIND_HERON && state.rng() < heartChance) {
@@ -273,7 +288,7 @@ export function stepWorld(state, intent, dt) {
     state.waveT += dt;
     spawnFromQueue(state);
     if (state.spawnQueue.length === 0 && state.foes.length === 0) {
-      if (state.wave >= TOTAL_WAVES) {
+      if (state.wave >= TOTAL_WAVES && !state.endless) {
         state.phase = PHASE_WON;
         state.cues.push('win');
         state.score += Math.round(state.health) * 10;
@@ -307,6 +322,12 @@ export function stepWorld(state, intent, dt) {
         foe.phase = state.rng() * Math.PI * 2;
         state.foes.push(foe);
       }
+    } else if (ev.type === 'phase2') {
+      state.cues.push('boss');
+      shake(state.fx, 12);
+      ring(state.fx, ev.x, ev.y, { maxRadius: 240, color: '#ff5252', width: 5 });
+      burst(state.fx, state.rng, ev.x, ev.y, { count: 30, color: '#90a4ae', speed: 300, size: 3.4, life: 0.6 });
+      floatText(state.fx, ev.x, ev.y - 96, 'THE HERON RAGES', { color: '#ff5252', size: 23 });
     }
   }
 
