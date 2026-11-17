@@ -34,7 +34,8 @@ That copies `game/` and `screenshots/` into `out/` and writes `out/dossier.json`
 - `game/src/upgrades.js` — the twelve level-up gifts and the derived stats they stack into
 - `game/src/waves.js` — the ten wave recipes and their scaling
 - `game/src/pickups.js` — fireflies (experience), lily hearts and the dragonfly blast
-- `game/src/render.js` — all drawing: pond, creatures, HUD and the title / pause / level-up / ending screens
+- `game/src/render.js` — composition and interface: pond, creatures, HUD panels, plaques and chips, and the title / pause / level-up / ending screens
+- `game/src/sprites.js` — the pre-rendered artwork: the milk frog and every pest painted once at 3× onto canvases (gradients, feather scallops, scale patterns), plus lily pads, reeds and the caustic light tile
 - `game/src/audio.js` — WebAudio-synthesised effects and the generative pentatonic music
 - `game/src/particles.js` — droplet bursts, motes, rings and floating text, in fixed-size pools
 - `game/src/input.js`, `game/src/random.js` — input state, and the seeded RNG with geometry helpers
