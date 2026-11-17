@@ -4,7 +4,7 @@
 [![rank](https://make.fun/badge/best-game-01/oysterhyd/pondlight/rank.svg)](https://make.fun/bounty/best-game-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=best-game-01)
 [![reward](https://make.fun/badge/best-game-01/oysterhyd/pondlight/reward.svg)](https://make.fun/bounty/best-game-01?utm_source=github&utm_medium=readme&utm_campaign=best-game-01)
 
-**Pondlight** is a complete arena-survival game for the desktop browser. You are the milk frog — bright yellow, cream belly, green eyes — and your pond has been invaded. Blow bubbles to pop ten waves of gnats, darters, spore moths and armoured beetles; gather the fireflies they drop to level up and choose from twelve gifts (twin bubbles, piercing pops, a slippery dash, pond regrowth…); then face the Shadow Heron, who fans feathers, summons gnats and swoops across the water on a telegraphed line.
+**Pondlight** is a complete arena-survival game for the desktop browser. You are the milk frog — bright yellow, cream belly, green eyes — and your pond has been invaded. Blow bubbles to pop ten waves of gnats, darters, spore moths, armoured beetles and the shell snail, which shrugs off your bubbles while it is tucked away and dares you to catch it peeking; from the middle waves the pests also arrive **gilded** — elite, bigger, and far more generous when popped. Gather the fireflies they drop to level up and choose from sixteen gifts (seeking bubbles, splash pops, a standing shockwave, a dash that cuts…); clear a wave untouched for a Flawless bonus; then face the Shadow Heron in a rainstorm, who fans feathers, summons gnats and swoops across the water on a telegraphed line.
 
 It is one static site: plain ES modules under `game/`, no build step, no library, no network request. Sound and music are synthesised with WebAudio, the art is drawn in code, and the simulation runs on a fixed 60 Hz step from a seeded RNG, so every run is reproducible. It keeps your best score in `localStorage`.
 
@@ -29,9 +29,9 @@ That copies `game/` and `screenshots/` into `out/` and writes `out/dossier.json`
 
 - `game/src/config.js` — every tuning number: field, frog, bubbles, foes, the heron, combo, palette
 - `game/src/world.js` — the whole simulation in fixed steps: spawning, collisions, combo, waves, winning and losing
-- `game/src/enemies.js` — the five foes and their behaviours, including the heron's fan, summons and swoop
+- `game/src/enemies.js` — the six foes and their behaviours, elite gilding, and the heron's fan, summons and swoop
 - `game/src/player.js` — the frog: movement, dash, and the bubble weapon
-- `game/src/upgrades.js` — the twelve level-up gifts and the derived stats they stack into
+- `game/src/upgrades.js` — the sixteen level-up gifts and the derived stats they stack into
 - `game/src/waves.js` — the ten wave recipes and their scaling
 - `game/src/pickups.js` — fireflies (experience), lily hearts and the dragonfly blast
 - `game/src/render.js` — composition and interface: pond, creatures, HUD panels, plaques and chips, and the title / pause / level-up / ending screens

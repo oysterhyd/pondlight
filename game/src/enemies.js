@@ -1,38 +1,44 @@
-// The five foes of the pond and how each one moves.
+// The six foes of the pond and how each one moves.
 // Every foe is a plain object made by makeFoe; stepFoe advances one foe for a
 // fixed step and returns events the world acts on (a spore to fire, a summon
 // to spawn), so this file never reaches into the world's arrays directly.
 
-import { FOE, HERON, SPORE, FIELD } from './config.js';
+import { FOE, HERON, SPORE, FIELD, SNAIL, ELITE } from './config.js';
 import { angleTo, clamp, distance } from './random.js';
 
 export const KIND_GNAT = 'gnat';
 export const KIND_DARTER = 'darter';
 export const KIND_MOTH = 'moth';
 export const KIND_BEETLE = 'beetle';
+export const KIND_SNAIL = 'snail';
 export const KIND_HERON = 'heron';
 
-/** Create a foe of a kind at a position, scaled for the wave it belongs to. */
-export function makeFoe(kind, x, y, scale) {
+/** Create a foe of a kind at a position, scaled for the wave it belongs to.
+ *  `elite` gilds a lesser foe: bigger, tougher, worth more (see ELITE). */
+export function makeFoe(kind, x, y, scale, elite = false) {
   const base = FOE[kind];
-  const health = Math.round(base.health * scale.health);
+  const gild = elite ? ELITE : null;
+  const health = Math.round(base.health * scale.health * (gild ? gild.healthMul : 1));
   return {
     kind,
+    elite: Boolean(gild),
     x,
     y,
     vx: 0,
     vy: 0,
-    radius: base.radius,
+    radius: Math.round(base.radius * (gild ? gild.radiusMul : 1)),
     hp: health,
     maxHp: health,
-    speed: base.speed * scale.speed,
+    speed: base.speed * scale.speed * (gild ? gild.speedMul : 1),
     damage: Math.round(base.damage * scale.damage),
-    score: base.score,
-    fireflies: base.fireflies,
+    score: base.score * (gild ? gild.scoreMul : 1),
+    fireflies: base.fireflies + (gild ? gild.firefliesBonus : 0),
     t: 0,
     phase: 0,
-    state: kind === KIND_HERON ? 'stalk' : 'chase',
+    state: kind === KIND_HERON ? 'stalk' : kind === KIND_SNAIL ? 'peek' : 'chase',
     stateT: 0,
+    dashHitCd: 0,
+    blockCueT: 0,
     fireT: 1 + scale.wave * 0.1,
     fanT: HERON.fanInterval,
     swoopT: HERON.swoopEvery,
@@ -120,6 +126,22 @@ function stepBeetle(foe, player, dt, rng) {
   steer(foe, player.x, player.y, foe.speed, dt, 0.06, rng);
 }
 
+/** The armoured snail: it crawls with its head out (peek), then tucks into
+ *  its shell and barely creeps (tuck). World.js prices bubble damage by the
+ *  state: tucked is armoured, peeking is vulnerable. Patience, or pierce. */
+function stepSnail(foe, player, dt, rng) {
+  foe.stateT += dt;
+  if (foe.state === 'peek' && foe.stateT > SNAIL.peekSeconds) {
+    foe.state = 'tuck';
+    foe.stateT = 0;
+  } else if (foe.state === 'tuck' && foe.stateT > SNAIL.tuckSeconds) {
+    foe.state = 'peek';
+    foe.stateT = 0;
+  }
+  const speed = foe.state === 'tuck' ? foe.speed * 0.22 : foe.speed;
+  steer(foe, player.x, player.y, speed, dt, 0.04, rng);
+}
+
 /** The Shadow Heron, the wave-ten boss. It stalks, fans feathers, summons
  *  gnats, and swoops across the pond on a telegraphed line. Below a third of
  *  its health it enrages: everything it does comes faster. */
@@ -180,11 +202,14 @@ function stepHeron(foe, player, dt, rng, events) {
 export function stepFoe(foe, player, dt, rng, events) {
   foe.t += dt;
   foe.flash = Math.max(0, foe.flash - dt * 6);
+  foe.dashHitCd = Math.max(0, (foe.dashHitCd ?? 0) - dt);
+  foe.blockCueT = Math.max(0, (foe.blockCueT ?? 0) - dt);
   switch (foe.kind) {
     case KIND_GNAT: stepGnat(foe, player, dt, rng); break;
     case KIND_DARTER: stepDarter(foe, player, dt, rng); break;
     case KIND_MOTH: stepMoth(foe, player, dt, rng, events); break;
     case KIND_BEETLE: stepBeetle(foe, player, dt, rng); break;
+    case KIND_SNAIL: stepSnail(foe, player, dt, rng); break;
     case KIND_HERON: stepHeron(foe, player, dt, rng, events); break;
     default: break;
   }

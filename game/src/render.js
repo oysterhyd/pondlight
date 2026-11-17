@@ -9,7 +9,7 @@
 import { COLORS, FIELD } from './config.js';
 import { TOTAL_WAVES } from './waves.js';
 import { PHASE_BREAK, PHASE_FIGHT, PHASE_LOST } from './world.js';
-import { KIND_BEETLE, KIND_DARTER, KIND_GNAT, KIND_HERON, KIND_MOTH } from './enemies.js';
+import { KIND_BEETLE, KIND_DARTER, KIND_GNAT, KIND_HERON, KIND_MOTH, KIND_SNAIL } from './enemies.js';
 import { PICKUP_DRAGONFLY, PICKUP_FIREFLY, PICKUP_HEART } from './pickups.js';
 import { drawEffects } from './particles.js';
 import { clamp } from './random.js';
@@ -17,7 +17,7 @@ import {
   BEETLE_FRAMES, BEETLE_WHITE, BUBBLE_SPRITE, CAUSTIC_TILE, DARTER_FRAMES, DARTER_WHITE,
   DRAGONFLY_FRAMES, FEATHER_SPRITE, FIREFLY_SPRITE, FROG_BODY, FROG_FRAMES, FROG_WHITE,
   GNAT_FRAMES, GNAT_WHITE, HEART_SPRITE, HERON_FRAMES, HERON_WHITE, MOTH_FRAMES, MOTH_WHITE,
-  PAD_SPRITES, REED_SPRITE, SPORE_SPRITE, blit, makeVignette,
+  PAD_SPRITES, REED_SHADOW, REED_SPRITE, SNAIL_FRAMES, SNAIL_WHITE, SPORE_SPRITE, blit, makeVignette,
 } from './sprites.js';
 
 export const SCREEN_TITLE = 'title';
@@ -260,6 +260,33 @@ function drawBeetle(ctx, foe) {
   if (foe.flash > 0) blit(ctx, BEETLE_WHITE[frame], foe.x, foe.y, { rot: angle, alpha: foe.flash * 0.8, scale: foe.radius / 23 });
 }
 
+function drawSnail(ctx, foe) {
+  const tucked = foe.state === 'tuck';
+  const frame = tucked ? 1 : 0;
+  const angle = Math.atan2(foe.vy, foe.vx) + Math.PI / 2;
+  shadow(ctx, foe.x, foe.y, foe.radius * 1.05);
+  blit(ctx, SNAIL_FRAMES[frame], foe.x, foe.y, { rot: angle, scale: foe.radius / 20 });
+  if (foe.flash > 0) blit(ctx, SNAIL_WHITE[frame], foe.x, foe.y, { rot: angle, alpha: foe.flash * 0.8, scale: foe.radius / 20 });
+  if (tucked) {
+    // A small shield floats over the shell: this one is armoured right now.
+    const sx = foe.x;
+    const sy = foe.y - foe.radius - 27;
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#ffe082';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - 6);
+    ctx.lineTo(sx + 5.4, sy - 3.8);
+    ctx.lineTo(sx + 5.4, sy + 1);
+    ctx.quadraticCurveTo(sx + 5.4, sy + 5.6, sx, sy + 7.4);
+    ctx.quadraticCurveTo(sx - 5.4, sy + 5.6, sx - 5.4, sy + 1);
+    ctx.lineTo(sx - 5.4, sy - 3.8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 function drawHeron(ctx, foe, state) {
   if (foe.state === 'warn' && foe.swoopFrom && foe.swoopTo) {
     ctx.save();
@@ -283,11 +310,27 @@ function drawHeron(ctx, foe, state) {
 }
 
 function drawFoe(ctx, foe, state) {
+  // Elites wear a slowly turning gilded ring.
+  if (foe.elite) {
+    ctx.save();
+    ctx.translate(foe.x, foe.y);
+    ctx.rotate(foe.t * 0.9);
+    ctx.strokeStyle = 'rgba(255, 213, 79, 0.85)';
+    ctx.lineWidth = 2.4;
+    ctx.setLineDash([10, 7]);
+    ctx.beginPath();
+    ctx.arc(0, 0, foe.radius + 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    ellipse(ctx, foe.x, foe.y + foe.radius * 0.8, foe.radius * 1.15, foe.radius * 0.4, 0, 'rgba(255, 183, 0, 0.10)');
+  }
   switch (foe.kind) {
     case KIND_GNAT: drawGnat(ctx, foe); break;
     case KIND_DARTER: drawDarter(ctx, foe); break;
     case KIND_MOTH: drawMoth(ctx, foe); break;
     case KIND_BEETLE: drawBeetle(ctx, foe); break;
+    case KIND_SNAIL: drawSnail(ctx, foe); break;
     case KIND_HERON: drawHeron(ctx, foe, state); break;
     default: break;
   }
@@ -369,6 +412,51 @@ export function drawWorld(ctx, state) {
 
   if (!vignette) vignette = makeVignette(FIELD.width, FIELD.height);
   ctx.drawImage(vignette, 0, 0);
+
+  // The finale is a storm: when the Heron is on the pond the light drops,
+  // rain stitches the water, and now and then the sky flickers.
+  if (state.boss || state.wave === TOTAL_WAVES) {
+    ctx.fillStyle = 'rgba(5, 16, 28, 0.26)';
+    ctx.fillRect(0, 0, FIELD.width, FIELD.height);
+    // Rain streaks.
+    ctx.save();
+    ctx.strokeStyle = 'rgba(190, 230, 245, 0.34)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let i = 0; i < 90; i += 1) {
+      const rx = ((i * 149.7 + state.time * 130) % (FIELD.width + 60)) - 30;
+      const ry = ((i * 83.3 + state.time * 760 * (0.85 + (i % 4) * 0.09)) % (FIELD.height + 40)) - 20;
+      ctx.moveTo(rx, ry);
+      ctx.lineTo(rx - 4.5, ry + 17);
+    }
+    ctx.stroke();
+    ctx.restore();
+    // Rain rings where drops strike.
+    ctx.save();
+    ctx.strokeStyle = '#bfeaf2';
+    for (let i = 0; i < 16; i += 1) {
+      const phase = (state.time * 0.9 + i * 0.618) % 1;
+      const rx = (i * 263.4) % FIELD.width;
+      const ry = (i * 179.9) % FIELD.height;
+      ctx.globalAlpha = 0.28 * (1 - phase);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.ellipse(rx, ry, 3 + phase * 13, (3 + phase * 13) * 0.42, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Lightning: a brief brightening every few seconds.
+    const cycle = state.time % 7.3;
+    if (cycle < 0.1) {
+      ctx.fillStyle = `rgba(210, 235, 255, ${0.13 * (1 - cycle / 0.1)})`;
+      ctx.fillRect(0, 0, FIELD.width, FIELD.height);
+    }
+  }
+
+  // Foreground reeds, near-black silhouettes that frame the pond's corners.
+  blit(ctx, REED_SHADOW, 8, FIELD.height - 26, { scale: 1.02, alpha: 0.34 });
+  blit(ctx, REED_SHADOW, FIELD.width - 10, FIELD.height - 22, { scale: 1.18, alpha: 0.38, flipX: true });
+  blit(ctx, REED_SHADOW, FIELD.width - 96, FIELD.height - 8, { scale: 0.8, alpha: 0.28 });
 }
 
 /* ---------------- HUD and screens ---------------- */
@@ -680,6 +768,10 @@ const ICON_STYLE = {
   leaf: { accent: '#69f0ae', draw: (ctx, x, y, s) => { const g = ctx.createLinearGradient(x, y + s * 0.6, x, y - s * 0.6); g.addColorStop(0, '#2e9e57'); g.addColorStop(1, '#7bf0a8'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, y + s * 0.62); ctx.quadraticCurveTo(x - s * 0.66, y - s * 0.18, x, y - s * 0.62); ctx.quadraticCurveTo(x + s * 0.66, y - s * 0.18, x, y + s * 0.62); ctx.fill(); ctx.strokeStyle = 'rgba(10, 60, 30, 0.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y + s * 0.55); ctx.lineTo(x, y - s * 0.5); ctx.stroke(); } },
   bolt: { accent: '#ffd54f', draw: (ctx, x, y, s) => { const g = ctx.createLinearGradient(x, y - s * 0.65, x, y + s * 0.65); g.addColorStop(0, '#fff59d'); g.addColorStop(1, '#f9a825'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x + s * 0.14, y - s * 0.66); ctx.lineTo(x - s * 0.4, y + s * 0.1); ctx.lineTo(x - s * 0.03, y + s * 0.1); ctx.lineTo(x - s * 0.14, y + s * 0.66); ctx.lineTo(x + s * 0.4, y - s * 0.1); ctx.lineTo(x + s * 0.03, y - s * 0.1); ctx.closePath(); ctx.fill(); ctx.strokeStyle = 'rgba(146, 96, 0, 0.5)'; ctx.lineWidth = 1.6; ctx.stroke(); } },
   shield: { accent: '#90caf9', draw: (ctx, x, y, s) => { const g = ctx.createLinearGradient(x, y - s * 0.6, x, y + s * 0.68); g.addColorStop(0, '#bbdefb'); g.addColorStop(1, '#1e6fb8'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, y - s * 0.6); ctx.lineTo(x + s * 0.5, y - s * 0.36); ctx.lineTo(x + s * 0.5, y + s * 0.08); ctx.quadraticCurveTo(x + s * 0.5, y + s * 0.55, x, y + s * 0.68); ctx.quadraticCurveTo(x - s * 0.5, y + s * 0.55, x - s * 0.5, y + s * 0.08); ctx.lineTo(x - s * 0.5, y - s * 0.36); ctx.closePath(); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - s * 0.3, y - s * 0.28); ctx.lineTo(x - s * 0.3, y + s * 0.05); ctx.stroke(); } },
+  splash: { accent: '#4dd0e1', draw: (ctx, x, y, s) => { blit(ctx, BUBBLE_SPRITE, x, y - s * 0.08, { scale: 0.66 }); ctx.fillStyle = '#aee9ff'; for (const [dx, dy, r] of [[-0.52, 0.3, 0.09], [0.52, 0.3, 0.09], [-0.34, 0.52, 0.07], [0.34, 0.52, 0.07], [0, 0.58, 0.08]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, Math.PI * 2); ctx.fill(); } } },
+  seeker: { accent: '#ce93d8', draw: (ctx, x, y, s) => { ctx.strokeStyle = '#e1bee7'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x + s * 0.16, y - s * 0.1, s * 0.44, Math.PI * 0.7, Math.PI * 1.75); ctx.stroke(); ctx.fillStyle = '#f3c4fb'; ctx.beginPath(); ctx.moveTo(x + s * 0.52, y - s * 0.52); ctx.lineTo(x + s * 0.28, y - s * 0.3); ctx.lineTo(x + s * 0.58, y - s * 0.22); ctx.closePath(); ctx.fill(); blit(ctx, BUBBLE_SPRITE, x - s * 0.18, y + s * 0.22, { scale: 0.5 }); circle(ctx, x + s * 0.3, y + s * 0.34, s * 0.07, '#ef5350'); } },
+  ripple: { accent: '#80d8ff', draw: (ctx, x, y, s) => { ctx.strokeStyle = '#aee9ff'; for (const [r, lw, a] of [[0.2, 4.4, 1], [0.42, 3.4, 0.75], [0.64, 2.6, 0.5]]) { ctx.save(); ctx.globalAlpha = a; ctx.lineWidth = lw; ctx.beginPath(); ctx.ellipse(x, y, s * r, s * r * 0.62, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); } circle(ctx, x, y, s * 0.07, '#e1f5fe'); } },
+  greed: { accent: '#ffe082', draw: (ctx, x, y, s) => { blit(ctx, FIREFLY_SPRITE, x - s * 0.1, y + s * 0.05, { scale: 1.05 }); text(ctx, '+', x + s * 0.34, y - s * 0.3, { size: s * 0.62, align: 'center', weight: 800, color: '#ffd54f' }); } },
 };
 
 export function drawLevelUp(ctx, state, choices) {

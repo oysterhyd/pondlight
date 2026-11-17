@@ -1,9 +1,10 @@
 // The ten waves of a Pondlight run.
 // A wave is a list of spawn groups; each group drips its foes in over a few
-// seconds from the pond's edge. Waves 1–9 mix the four lesser foes in growing
-// numbers, and wave 10 is the Shadow Heron alone. Clearing wave 10 wins.
+// seconds from the pond's edge. Waves 1–9 mix the five lesser foes in growing
+// numbers (the armoured snail joins from wave 5), and wave 10 is the Shadow
+// Heron alone. Clearing wave 10 wins.
 
-import { KIND_BEETLE, KIND_DARTER, KIND_GNAT, KIND_HERON, KIND_MOTH } from './enemies.js';
+import { KIND_BEETLE, KIND_DARTER, KIND_GNAT, KIND_HERON, KIND_MOTH, KIND_SNAIL } from './enemies.js';
 
 export const TOTAL_WAVES = 10;
 
@@ -13,11 +14,11 @@ export const WAVES = [
   { groups: [{ kind: KIND_GNAT, count: 9, delay: 0.5, gap: 0.6 }, { kind: KIND_DARTER, count: 2, delay: 6, gap: 1.4 }] },
   { groups: [{ kind: KIND_GNAT, count: 8, delay: 0.5, gap: 0.55 }, { kind: KIND_MOTH, count: 2, delay: 5, gap: 2.2 }, { kind: KIND_DARTER, count: 3, delay: 10, gap: 1.2 }] },
   { groups: [{ kind: KIND_BEETLE, count: 2, delay: 1, gap: 2.5 }, { kind: KIND_GNAT, count: 10, delay: 2, gap: 0.5 }, { kind: KIND_DARTER, count: 3, delay: 9, gap: 1.1 }] },
-  { groups: [{ kind: KIND_MOTH, count: 3, delay: 0.5, gap: 2 }, { kind: KIND_GNAT, count: 12, delay: 3, gap: 0.45 }, { kind: KIND_BEETLE, count: 2, delay: 11, gap: 2.4 }] },
-  { groups: [{ kind: KIND_DARTER, count: 6, delay: 0.5, gap: 1 }, { kind: KIND_GNAT, count: 10, delay: 4, gap: 0.45 }, { kind: KIND_MOTH, count: 3, delay: 10, gap: 1.9 }] },
-  { groups: [{ kind: KIND_BEETLE, count: 4, delay: 0.5, gap: 2.2 }, { kind: KIND_DARTER, count: 5, delay: 5, gap: 1 }, { kind: KIND_GNAT, count: 12, delay: 8, gap: 0.4 }] },
-  { groups: [{ kind: KIND_MOTH, count: 5, delay: 0.5, gap: 1.7 }, { kind: KIND_BEETLE, count: 3, delay: 6, gap: 2.3 }, { kind: KIND_DARTER, count: 6, delay: 10, gap: 0.9 }] },
-  { groups: [{ kind: KIND_GNAT, count: 16, delay: 0.5, gap: 0.35 }, { kind: KIND_BEETLE, count: 4, delay: 6, gap: 2 }, { kind: KIND_MOTH, count: 4, delay: 9, gap: 1.6 }, { kind: KIND_DARTER, count: 6, delay: 12, gap: 0.9 }] },
+  { groups: [{ kind: KIND_MOTH, count: 3, delay: 0.5, gap: 2 }, { kind: KIND_GNAT, count: 12, delay: 3, gap: 0.45 }, { kind: KIND_BEETLE, count: 2, delay: 11, gap: 2.4 }, { kind: KIND_SNAIL, count: 2, delay: 16, gap: 3 }] },
+  { groups: [{ kind: KIND_DARTER, count: 6, delay: 0.5, gap: 1 }, { kind: KIND_GNAT, count: 10, delay: 4, gap: 0.45 }, { kind: KIND_MOTH, count: 3, delay: 10, gap: 1.9 }, { kind: KIND_SNAIL, count: 2, delay: 15, gap: 3 }] },
+  { groups: [{ kind: KIND_BEETLE, count: 4, delay: 0.5, gap: 2.2 }, { kind: KIND_DARTER, count: 5, delay: 5, gap: 1 }, { kind: KIND_GNAT, count: 12, delay: 8, gap: 0.4 }, { kind: KIND_SNAIL, count: 3, delay: 14, gap: 2.8 }] },
+  { groups: [{ kind: KIND_MOTH, count: 5, delay: 0.5, gap: 1.7 }, { kind: KIND_BEETLE, count: 3, delay: 6, gap: 2.3 }, { kind: KIND_DARTER, count: 6, delay: 10, gap: 0.9 }, { kind: KIND_SNAIL, count: 3, delay: 15, gap: 2.8 }] },
+  { groups: [{ kind: KIND_GNAT, count: 16, delay: 0.5, gap: 0.35 }, { kind: KIND_BEETLE, count: 4, delay: 6, gap: 2 }, { kind: KIND_MOTH, count: 4, delay: 9, gap: 1.6 }, { kind: KIND_DARTER, count: 6, delay: 12, gap: 0.9 }, { kind: KIND_SNAIL, count: 3, delay: 16, gap: 2.6 }] },
   { groups: [{ kind: KIND_HERON, count: 1, delay: 1.2, gap: 1 }] },
 ];
 

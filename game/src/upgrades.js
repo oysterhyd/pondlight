@@ -96,6 +96,38 @@ export const UPGRADES = [
     max: 4,
     apply: (s) => { s.armour *= 0.9; },
   },
+  {
+    id: 'splash',
+    name: 'Splash Pop',
+    icon: 'splash',
+    blurb: 'Bubbles burst, splashing nearby foes',
+    max: 3,
+    apply: (s) => { s.splashLevel += 1; },
+  },
+  {
+    id: 'seeker',
+    name: 'Seeking Bubbles',
+    icon: 'seeker',
+    blurb: 'Bubbles curve toward the nearest foe',
+    max: 2,
+    apply: (s) => { s.seekerTurn += 4.4; },
+  },
+  {
+    id: 'ripple',
+    name: 'Pond Ripple',
+    icon: 'ripple',
+    blurb: 'A shockwave rolls out every few seconds',
+    max: 3,
+    apply: (s) => { s.rippleEvery = s.rippleEvery === 0 ? 3.4 : s.rippleEvery * 0.78; s.rippleDamage += 9; },
+  },
+  {
+    id: 'greed',
+    name: 'Firefly Feast',
+    icon: 'greed',
+    blurb: '+30% experience from fireflies',
+    max: 3,
+    apply: (s) => { s.xpMul *= 1.3; },
+  },
 ];
 
 /** The frog's derived stats before any upgrade is applied. */
@@ -116,6 +148,12 @@ export function baseStats(config) {
     regen: PLAYER.regenBase,
     armour: 1,
     healOnTake: 0,
+    dashDamage: PLAYER.dashDamage,
+    splashLevel: 0,
+    seekerTurn: 0,
+    rippleEvery: 0,
+    rippleDamage: 7,
+    xpMul: 1,
   };
 }
 

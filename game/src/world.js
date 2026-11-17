@@ -4,10 +4,10 @@
 // nothing; sound cues are queued on state.cues for main.js to play, which
 // keeps this file silent, deterministic and easy to stage for screenshots.
 
-import { BUBBLE, COMBO, FIELD, FIREFLY, PLAYER, SPORE } from './config.js';
+import { BUBBLE, COMBO, FIELD, FIREFLY, PLAYER, SPORE, ELITE, SNAIL } from './config.js';
 import { makeRng, range } from './random.js';
 import { makePlayer, stepPlayer, isInvulnerable } from './player.js';
-import { makeFoe, stepFoe, separateFoes, KIND_BEETLE, KIND_HERON } from './enemies.js';
+import { makeFoe, stepFoe, separateFoes, KIND_BEETLE, KIND_HERON, KIND_SNAIL } from './enemies.js';
 import { makePickup, scatterFireflies, stepPickups, PICKUP_DRAGONFLY, PICKUP_HEART } from './pickups.js';
 import { buildSpawnQueue, spawnPoint, waveScale, INTERMISSION_SECONDS, TOTAL_WAVES } from './waves.js';
 import { computeStats } from './upgrades.js';
@@ -79,6 +79,8 @@ export function createWorld(seed) {
     cues: [],
     decor: makeDecor(rng),
     rippleT: 0,
+    auraT: 1.4,
+    waveHurt: false,
     announcedWave: 0,
   };
   state.stats = worldStats(state);
@@ -103,6 +105,7 @@ export function applyUpgrade(state, id) {
 function startWave(state, wave) {
   state.wave = wave;
   state.waveT = 0;
+  state.waveHurt = false;
   state.spawnQueue = buildSpawnQueue(wave);
   state.phase = PHASE_FIGHT;
   state.announcedWave = wave;
@@ -116,9 +119,13 @@ function spawnFromQueue(state) {
     const point = item.kind === KIND_HERON
       ? { x: FIELD.width / 2, y: 92 }
       : spawnPoint(state.rng, state.player, FIELD);
-    const foe = makeFoe(item.kind, point.x, point.y, waveScale(state.wave));
+    const elite = state.wave >= ELITE.fromWave
+      && item.kind !== KIND_HERON && item.kind !== KIND_SNAIL
+      && state.rng() < ELITE.chance;
+    const foe = makeFoe(item.kind, point.x, point.y, waveScale(state.wave), elite);
     foe.phase = state.rng() * Math.PI * 2;
     state.foes.push(foe);
+    if (elite) ring(state.fx, point.x, point.y, { maxRadius: 54, color: '#ffd54f', width: 3 });
     if (item.kind === KIND_HERON) {
       state.boss = foe;
       ring(state.fx, point.x, point.y, { maxRadius: 200, color: '#ff5252', width: 5 });
@@ -133,6 +140,7 @@ function hurtPlayer(state, damage) {
   if (isInvulnerable(state.player) || state.phase === PHASE_WON || state.phase === PHASE_LOST) return;
   const dealt = Math.max(1, Math.round(damage * state.stats.armour));
   state.health -= dealt;
+  state.waveHurt = true;
   state.player.hurtT = PLAYER.hurtGrace;
   state.combo = 0;
   state.comboT = 0;
@@ -168,10 +176,12 @@ function killFoe(state, foe) {
   });
   floatText(state.fx, foe.x, foe.y - foe.radius - 6, `+${gained}`, { color: multiplier > 1 ? '#ffd54f' : '#eaf7fa', size: multiplier > 2 ? 19 : 15 });
   scatterFireflies(state.pickups, foe.fireflies, foe.x, foe.y, state.rng);
-  if (foe.kind !== KIND_HERON && state.rng() < HEART_DROP_CHANCE) {
+  const heartChance = foe.elite ? ELITE.heartChance : HEART_DROP_CHANCE;
+  if (foe.kind !== KIND_HERON && state.rng() < heartChance) {
     state.pickups.push(makePickup(PICKUP_HEART, foe.x, foe.y, state.rng));
   }
-  if ((foe.kind === 'beetle' || foe.kind === KIND_HERON) && state.rng() < DRAGONFLY_DROP_CHANCE + (foe.kind === KIND_HERON ? 1 : 0)) {
+  const dragonflyChance = DRAGONFLY_DROP_CHANCE + (foe.elite ? ELITE.dragonflyChance : 0);
+  if ((foe.kind === 'beetle' || foe.kind === KIND_HERON || foe.elite) && state.rng() < dragonflyChance + (foe.kind === KIND_HERON ? 1 : 0)) {
     state.pickups.push(makePickup(PICKUP_DRAGONFLY, foe.x, foe.y, state.rng));
   }
   if (foe.kind === KIND_HERON) {
@@ -180,6 +190,53 @@ function killFoe(state, foe) {
     shake(state.fx, 13);
     ring(state.fx, foe.x, foe.y, { maxRadius: 260, color: '#ffe066', width: 5 });
   }
+}
+
+/** Price and apply damage to a foe from any source. The snail's shell is
+ *  priced here: tucked it takes SNAIL.tuckedArmour of the hit (with a clang
+ *  cue, throttled), peeking it takes extra. Returns true if the foe died. */
+function damageFoe(state, foe, damage, { knockX = 0, knockY = 0 } = {}) {
+  if (foe.dead) return false;
+  let dealt = damage;
+  if (foe.kind === KIND_SNAIL) {
+    if (foe.state === 'tuck') {
+      dealt = damage * SNAIL.tuckedArmour;
+      if (foe.blockCueT <= 0) {
+        foe.blockCueT = 0.24;
+        state.cues.push('block');
+        burst(state.fx, state.rng, foe.x, foe.y - foe.radius * 0.4, { count: 3, color: '#ffe082', speed: 130, size: 2.2, life: 0.25 });
+      }
+    } else {
+      dealt = damage * SNAIL.peekVulnerability;
+    }
+  }
+  foe.hp -= dealt;
+  foe.flash = 1;
+  if (knockX || knockY) {
+    if (foe.kind !== KIND_BEETLE && foe.kind !== KIND_HERON && foe.kind !== KIND_SNAIL) {
+      foe.x += knockX;
+      foe.y += knockY;
+    } else if (foe.kind === KIND_BEETLE && state.rng() < 0.5) {
+      foe.x += knockX * 0.4;
+      foe.y += knockY * 0.4;
+    }
+  }
+  if (foe.hp <= 0) {
+    killFoe(state, foe);
+    return true;
+  }
+  return false;
+}
+
+/** A cleared wave with no damage taken pays a flawless bonus. */
+function awardFlawless(state) {
+  if (state.waveHurt || state.wave < 2) return;
+  const bonus = 100 + state.wave * 20;
+  state.score += bonus;
+  state.cues.push('bonus');
+  floatText(state.fx, state.player.x, state.player.y - 44, `FLAWLESS +${bonus}`, { color: '#ffd54f', size: 21 });
+  ring(state.fx, state.player.x, state.player.y, { maxRadius: 120, color: '#ffd54f', width: 3 });
+  scatterFireflies(state.pickups, 3, state.player.x, state.player.y, state.rng);
 }
 
 function dragonflyBlast(state) {
@@ -221,6 +278,7 @@ export function stepWorld(state, intent, dt) {
         state.cues.push('win');
         state.score += Math.round(state.health) * 10;
       } else {
+        awardFlawless(state);
         state.phase = PHASE_BREAK;
         state.phaseT = INTERMISSION_SECONDS;
       }
@@ -252,8 +310,29 @@ export function stepWorld(state, intent, dt) {
     }
   }
 
-  // Bubbles against foes.
+  // Bubbles: seeking bubbles first bend toward the nearest foe, then fly.
   for (const b of state.bubbles) {
+    if (state.stats.seekerTurn > 0 && !b.dead) {
+      let best = null;
+      let bestD = 320;
+      for (const foe of state.foes) {
+        if (foe.dead) continue;
+        const d = Math.hypot(foe.x - b.x, foe.y - b.y);
+        if (d < bestD) { bestD = d; best = foe; }
+      }
+      if (best) {
+        const speed = Math.hypot(b.vx, b.vy);
+        const current = Math.atan2(b.vy, b.vx);
+        const wanted = Math.atan2(best.y - b.y, best.x - b.x);
+        let turn = wanted - current;
+        while (turn > Math.PI) turn -= Math.PI * 2;
+        while (turn < -Math.PI) turn += Math.PI * 2;
+        const maxTurn = state.stats.seekerTurn * dt;
+        const next = current + Math.max(-maxTurn, Math.min(maxTurn, turn));
+        b.vx = Math.cos(next) * speed;
+        b.vy = Math.sin(next) * speed;
+      }
+    }
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     b.life -= dt;
@@ -265,18 +344,22 @@ export function stepWorld(state, intent, dt) {
       if (foe.dead) continue;
       const d = Math.hypot(foe.x - b.x, foe.y - b.y);
       if (d <= foe.radius + b.radius) {
-        foe.hp -= b.damage;
-        foe.flash = 1;
         state.cues.push('hit');
         burst(state.fx, state.rng, b.x, b.y, { count: 3, color: '#cfeffb', speed: 120, size: 2.4, life: 0.3 });
-        if (foe.kind !== KIND_BEETLE && foe.kind !== KIND_HERON) {
-          foe.x += (b.vx / 640) * 5;
-          foe.y += (b.vy / 640) * 5;
-        } else if (foe.kind === KIND_BEETLE && state.rng() < 0.5) {
-          foe.x += (b.vx / 640) * 2;
-          foe.y += (b.vy / 640) * 2;
+        damageFoe(state, foe, b.damage, { knockX: (b.vx / 640) * 5, knockY: (b.vy / 640) * 5 });
+        // Splash Pop: the burst wets every other foe standing close.
+        if (state.stats.splashLevel > 0) {
+          const splashR = 42 + state.stats.splashLevel * 9;
+          const splashDmg = b.damage * (0.38 + state.stats.splashLevel * 0.09);
+          ring(state.fx, b.x, b.y, { maxRadius: splashR, color: '#81d4fa', life: 0.3, width: 2.5 });
+          state.cues.push('splash');
+          for (const other of state.foes) {
+            if (other === foe || other.dead) continue;
+            if (Math.hypot(other.x - b.x, other.y - b.y) <= splashR + other.radius * 0.5) {
+              damageFoe(state, other, splashDmg);
+            }
+          }
         }
-        if (foe.hp <= 0) killFoe(state, foe);
         if (b.pierceLeft > 0) b.pierceLeft -= 1;
         else { b.dead = true; break; }
       }
@@ -298,18 +381,47 @@ export function stepWorld(state, intent, dt) {
   }
   state.spores = state.spores.filter((s) => !s.dead);
   for (const foe of state.foes) {
-    if (Math.hypot(foe.x - state.player.x, foe.y - state.player.y) <= foe.radius + state.player.radius * 0.85) {
+    const dist = Math.hypot(foe.x - state.player.x, foe.y - state.player.y);
+    // The dash is a weapon: passing through a foe pops it, once per dash.
+    if (state.player.dashT > 0 && foe.dashHitCd <= 0 && dist <= foe.radius + state.player.radius + 6) {
+      foe.dashHitCd = 0.4;
+      state.cues.push('hit');
+      burst(state.fx, state.rng, foe.x, foe.y, { count: 7, color: '#ffe066', speed: 190, size: 3, life: 0.35 });
+      damageFoe(state, foe, state.stats.dashDamage, { knockX: (foe.x - state.player.x) * 0.14, knockY: (foe.y - state.player.y) * 0.14 });
+    }
+    if (dist <= foe.radius + state.player.radius * 0.85) {
       hurtPlayer(state, foe.damage);
       if (foe.kind === 'gnat') { foe.dead = true; burst(state.fx, state.rng, foe.x, foe.y, { count: 6, color: '#8d6e63', speed: 150, size: 2.6, life: 0.35 }); }
     }
   }
   state.foes = state.foes.filter((f) => !f.dead);
 
+  // Pond Ripple: a standing shockwave that shoves the pond's pests back.
+  if (state.stats.rippleEvery > 0) {
+    state.auraT -= dt;
+    if (state.auraT <= 0 && state.foes.length > 0) {
+      state.auraT = state.stats.rippleEvery;
+      state.cues.push('ripple');
+      ring(state.fx, state.player.x, state.player.y, { maxRadius: 132, color: '#80d8ff', width: 4, life: 0.5 });
+      for (const foe of [...state.foes]) {
+        const d = Math.hypot(foe.x - state.player.x, foe.y - state.player.y);
+        if (d <= 132 + foe.radius) {
+          const push = foe.kind === KIND_HERON ? 0 : 26;
+          damageFoe(state, foe, state.stats.rippleDamage, {
+            knockX: d > 1 ? ((foe.x - state.player.x) / d) * push : 0,
+            knockY: d > 1 ? ((foe.y - state.player.y) / d) * push : 0,
+          });
+        }
+      }
+      state.foes = state.foes.filter((f) => !f.dead);
+    }
+  }
+
   // Pickups, experience and healing.
   const got = stepPickups(state.pickups, state.player, state.stats, dt);
   if (got.fireflies > 0) {
     state.cues.push('pickup');
-    state.xp += got.fireflies;
+    state.xp += got.fireflies * state.stats.xpMul;
     mote(state.fx, state.rng, state.player.x, state.player.y, {});
     while (state.xp >= state.xpNeed) {
       state.xp -= state.xpNeed;

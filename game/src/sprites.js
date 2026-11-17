@@ -37,17 +37,23 @@ export function blit(ctx, spr, x, y, { rot = 0, scale = 1, alpha = 1, flipX = fa
   ctx.restore();
 }
 
-/** A solid-white silhouette of a sprite, for hit flashes. */
-function whiten(spr) {
+/** A solid silhouette of a sprite in one colour (hit flashes are white;
+ *  foreground reeds are deep pond-green). */
+function silhouette(spr, color) {
   const c = document.createElement('canvas');
   c.width = spr.c.width;
   c.height = spr.c.height;
   const ctx = c.getContext('2d');
   ctx.drawImage(spr.c, 0, 0);
   ctx.globalCompositeOperation = 'source-in';
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = color;
   ctx.fillRect(0, 0, c.width, c.height);
   return { c, w: spr.w, h: spr.h };
+}
+
+/** A solid-white silhouette of a sprite, for hit flashes. */
+function whiten(spr) {
+  return silhouette(spr, '#ffffff');
 }
 
 function circle(ctx, x, y, r, fill) {
@@ -422,6 +428,69 @@ function paintBeetle(step) {
 export const BEETLE_FRAMES = [paintBeetle(true), paintBeetle(false)];
 export const BEETLE_WHITE = BEETLE_FRAMES.map(whiten);
 
+/** The armoured snail: two frames, head out (peek) and tucked. Art faces
+ *  -y like the beetle; the renderer rotates it to its crawl. Radius 20. */
+function paintSnail(tucked) {
+  return make(92, 92, (ctx) => {
+    // The soft foot, a slug's skirt around the shell.
+    ellipse(ctx, 0, 8, 21, 15.5, 0, radial(ctx, -5, 3, 3, 24, [[0, '#d7ccc8'], [0.7, '#a1887f'], [1, '#6d4c41']]));
+    ellipse(ctx, 0, 13, 15, 9.5, 0, 'rgba(255, 244, 230, 0.35)');
+    if (!tucked) {
+      // Head and eyestalks reaching forward.
+      ctx.strokeStyle = '#8d6e63';
+      ctx.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(side * 4.5, -13);
+        ctx.quadraticCurveTo(side * 7.5, -21, side * 10, -24.5);
+        ctx.stroke();
+        circle(ctx, side * 10.4, -25.4, 2.9, '#5d4037');
+        circle(ctx, side * 10.4, -25.4, 1.3, '#ffccbc');
+      }
+      ellipse(ctx, 0, -12.5, 8.6, 6.8, 0, radial(ctx, -2.6, -15, 2, 10, [[0, '#d7ccc8'], [1, '#8d6e63']]));
+    }
+    // The shell: a coiled dome of amber bands with a glossy sweep.
+    const shellY = tucked ? 1.5 : -1;
+    ctx.fillStyle = radial(ctx, -6, shellY - 8, 4, 27, [[0, '#ffcc80'], [0.45, '#c47b3a'], [0.8, '#8d5524'], [1, '#5f360f']]);
+    ctx.beginPath();
+    ctx.arc(0, shellY, 20.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(46, 24, 4, 0.55)';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    // The coil: shrinking arcs spiralling to the centre.
+    ctx.strokeStyle = 'rgba(70, 38, 8, 0.65)';
+    ctx.lineWidth = 2.1;
+    for (const rr of [15.5, 10.5, 6]) {
+      ctx.beginPath();
+      ctx.arc(1.5, shellY + 0.5, rr, Math.PI * 0.9, Math.PI * 2.15);
+      ctx.stroke();
+    }
+    circle(ctx, 1.5, shellY + 0.5, 2.6, '#5f360f');
+    // Growth bands across the dome.
+    ctx.strokeStyle = 'rgba(255, 226, 170, 0.35)';
+    ctx.lineWidth = 2.6;
+    for (const rr of [17.8, 12.8]) {
+      ctx.beginPath();
+      ctx.arc(0, shellY, rr, Math.PI * 1.15, Math.PI * 1.7);
+      ctx.stroke();
+    }
+    // Gloss.
+    ellipse(ctx, -7.5, shellY - 10.5, 7.6, 4, -0.6, 'rgba(255, 248, 225, 0.55)');
+    if (tucked) {
+      // A shut, armoured look: a darker rim pulled over the foot.
+      ctx.strokeStyle = 'rgba(46, 24, 4, 0.8)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, shellY, 20.5, Math.PI * 0.08, Math.PI * 0.92);
+      ctx.stroke();
+    }
+  });
+}
+export const SNAIL_FRAMES = [paintSnail(false), paintSnail(true)];
+export const SNAIL_WHITE = SNAIL_FRAMES.map(whiten);
+
 /** The Shadow Heron: three wing frames, facing +x. Art radius 54. */
 function paintHeron(flap) {
   return make(300, 264, (ctx) => {
@@ -764,6 +833,9 @@ export const REED_SPRITE = make(90, 190, (ctx) => {
   }
 });
 
+/** The reed cluster as a near-black silhouette, for foreground framing. */
+export const REED_SHADOW = silhouette(REED_SPRITE, '#04161d');
+
 /** A soft caustic light tile, tiled over the water at low alpha. */
 export const CAUSTIC_TILE = (() => {
   const size = 288;
@@ -790,8 +862,7 @@ export const CAUSTIC_TILE = (() => {
   return { c, w: size, h: size };
 })();
 
-/** A finished vignette for the whole field, painted once. */
-export function makeVignette(width, height) {
+/** A finished vignette for the whole field, painted once. */export function makeVignette(width, height) {
   const c = document.createElement('canvas');
   c.width = width;
   c.height = height;

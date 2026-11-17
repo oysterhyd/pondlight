@@ -24,6 +24,9 @@ export const PLAYER = {
   magnetBase: 74,
   /** Health regained per second once the Regrowth upgrade is taken. */
   regenBase: 0,
+  /** Damage the dash itself deals to a foe it passes through: the dash is
+   *  a weapon as well as an escape, once per foe per dash. */
+  dashDamage: 22,
 };
 
 /** The bubbles the frog blows. One entry per shot before upgrades multiply them. */
@@ -42,8 +45,17 @@ export const FOE = {
   darter: { radius: 15, health: 30, speed: 92, damage: 12, score: 55, fireflies: 2 },
   moth: { radius: 17, health: 38, speed: 64, damage: 10, score: 80, fireflies: 2 },
   beetle: { radius: 23, health: 110, speed: 44, damage: 16, score: 130, fireflies: 3 },
+  snail: { radius: 20, health: 150, speed: 30, damage: 12, score: 160, fireflies: 3 },
   heron: { radius: 54, health: 1500, speed: 56, damage: 20, score: 3000, fireflies: 24 },
 };
+
+/** The armoured snail: tucked into its shell it shrugs off most damage;
+ *  peeking out to crawl, it takes extra. Its cycle is the fight. */
+export const SNAIL = { peekSeconds: 2.4, tuckSeconds: 1.7, tuckedArmour: 0.3, peekVulnerability: 1.3 };
+
+/** Elite foes: from the middle waves, some lesser foes arrive gilded —
+ *  bigger, tougher, worth far more, and generous with their drops. */
+export const ELITE = { fromWave: 5, chance: 0.13, radiusMul: 1.32, healthMul: 2.6, speedMul: 0.94, scoreMul: 3, firefliesBonus: 2, heartChance: 0.3, dragonflyChance: 0.12 };
 
 /** A moth's spore: the only enemy projectile besides the heron's feather fan. */
 export const SPORE = { radius: 6, speed: 215, lifeSeconds: 3.4, damage: 9 };
@@ -97,6 +109,7 @@ export const COLORS = {
   darter: '#4fc3f7',
   moth: '#b39ddb',
   beetle: '#5d4037',
+  snail: '#a1887f',
   heron: '#455a64',
   heronBeak: '#ffb300',
   text: '#eaf7fa',

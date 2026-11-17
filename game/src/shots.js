@@ -73,27 +73,42 @@ function stageTitle(seed) {
   return { state, screen: SCREEN_TITLE, choices: null };
 }
 
-/** Stage mid-game combat: the pilot plays on until a busy wave-3+ frame —
- *  several foes on screen and bubbles in flight — and freezes there. */
+/** Stage mid-game combat: the pilot plays a full run while the staging
+ *  scores every frame (a busy fight, the snail on stage, the frog in the
+ *  thick of it), then replays deterministically to the best frame found. */
 function stagePlay(seed) {
-  const state = createWorld(seed);
-  const cap = 60 * 240;
-  for (let i = 0; i < cap; i += 1) {
-    stepWorld(state, pilotIntent(state), STEP);
-    state.cues.length = 0;
-    if (state.pendingLevels > 0) {
-      // Spend level-ups at once in staging, choosing the first card.
-      const choices = drawChoices(state.rng, state.taken);
-      if (choices.length > 0) applyUpgrade(state, choices[0].id);
-      state.pendingLevels = 0;
+  const playTo = (limit, onStep) => {
+    const state = createWorld(seed);
+    for (let i = 0; i < limit; i += 1) {
+      stepWorld(state, pilotIntent(state), STEP);
+      state.cues.length = 0;
+      if (state.pendingLevels > 0) {
+        // Spend level-ups at once in staging, choosing the first card.
+        const choices = drawChoices(state.rng, state.taken);
+        if (choices.length > 0) applyUpgrade(state, choices[0].id);
+        state.pendingLevels = 0;
+      }
+      if (onStep && onStep(state, i)) return { state, stopped: true };
+      if (state.phase === 'lost' || state.phase === 'won') break;
     }
-    if (state.wave >= 3 && state.phase === PHASE_FIGHT && state.foes.length >= 7 && state.bubbles.length >= 4) {
-      // Prefer a frame where the fight is happening mid-pond, not at the edges.
-      const central = state.foes.filter((f) => f.x > 220 && f.x < 1060 && f.y > 120 && f.y < 600).length;
-      if (central >= 4) break;
-    }
-    if (state.phase === 'lost') break;
-  }
+    return { state, stopped: false };
+  };
+  let bestStep = -1;
+  let bestScore = -1;
+  playTo(60 * 300, (state, i) => {
+    if (state.wave < 5 || state.wave > 9 || state.phase !== PHASE_FIGHT) return false;
+    const central = state.foes.filter((f) => f.x > 220 && f.x < 1060 && f.y > 120 && f.y < 600).length;
+    const snail = state.foes.some((f) => f.kind === 'snail');
+    const frogCentral = state.player.x > 280 && state.player.x < 1000 && state.player.y > 160 && state.player.y < 580;
+    let score = state.foes.length + central;
+    if (snail) score += 11;
+    if (state.foes.some((f) => f.elite)) score += 2;
+    if (frogCentral) score += 3;
+    if (state.bubbles.length >= 3) score += 2;
+    if (score > bestScore) { bestScore = score; bestStep = i; }
+    return false;
+  });
+  const { state } = playTo(bestStep >= 0 ? bestStep + 1 : 60 * 60, null);
   state.health = Math.max(state.health, 62);
   return { state, screen: SCREEN_PLAY, choices: null };
 }

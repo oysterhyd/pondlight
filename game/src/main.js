@@ -81,6 +81,10 @@ function playCues() {
     else if (cue === 'boss') audio.boss();
     else if (cue === 'win') audio.win();
     else if (cue === 'lose') audio.lose();
+    else if (cue === 'block') audio.block();
+    else if (cue === 'splash') audio.splash();
+    else if (cue === 'ripple') audio.ripple();
+    else if (cue === 'bonus') audio.bonus();
   }
   state.cues.length = 0;
 }
